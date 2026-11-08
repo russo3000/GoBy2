@@ -35,11 +35,19 @@ working production permissions. No decision IDs were available for this audit.
 
 ## Remaining verification and limitations
 
-No physical-phone execution, Expo Go compatibility, native photo persistence,
-keyboard/safe-area behavior, or native back gestures have been verified. Earlier
-iOS bundle exports passed, but iOS was not rerun during this audit.
-No installed Android/iOS build or store release is evidenced. No EAS configuration
-or distributable APK/AAB/IPA is present. See device-checks.md for the device pass.
+Igar has since confirmed physical Android execution through Expo Go and completed
+core manual checks: save/edit, restart persistence, photos and photo restart
+persistence, offline save/open, Android Back, keyboard/form scrolling, search,
+lists, shelves, themes, Maps, photo controls, and placeholder tabs. The Mac browser
+at http://localhost/Goby2/ also opens and is interactive, reported by Igar.
+See device-checks.md for evidence boundaries and the detailed results.
+
+Larger-text testing was skipped at Igar's request. TalkBack, detailed safe areas,
+offline cold startup without Metro, native upgrade migration, and error paths
+remain unverified. Device/OS/Expo Go versions were not captured. Earlier iOS
+bundle exports passed, but no iOS device run is evidenced.
+No standalone Android/iOS build or store release is evidenced. No EAS configuration
+or distributable APK/AAB/IPA is present.
 
 Guest saves are local only. Browser and phone do not sync; localhost and
 localhost:8081 use separate browser storage origins. Replaced photos can leave
@@ -61,8 +69,8 @@ messages or files are assumed accessible.
 First verify the browser, then start Expo in a second Terminal. The Mac previously
 used nvm Node 26.13.0 successfully; Node 24 is the documented development baseline.
 The old Homebrew Apache service previously occupied port 80 and was stopped.
-A screenshot previously showed `/Goby2/` working, but current Mac process state
-must be checked with Igar. Do not change Apache aliases to fix the Node gateway.
+Igar confirmed `/Goby2/` working and subsequently launched Goby on Android via
+Expo Go. Processes still need to be started again after their Terminals close. Do not change Apache aliases to fix the Node gateway.
 
 Browser Terminal, assuming the previously successful dist build still exists:
 
@@ -87,6 +95,5 @@ npm start
 ```
 
 Connect Android and Mac to the same Wi-Fi; open a compatible Expo Go and scan
-the current QR from its scanner. Confirm compatibility with SDK 58 from the
-actual phone result. If unsupported, choose a compatible client or development
-build based on that evidence; do not downgrade the app speculatively.
+the current QR from its scanner. Igar confirmed this launch works on his Android
+phone in this session. Recheck client compatibility if Expo Go or the SDK changes.
