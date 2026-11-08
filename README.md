@@ -106,6 +106,8 @@ photo picking/copying, keyboard layout, safe areas, and native back/swipe gestur
 
 ## References
 
+- [Verified development baseline](docs/current-state.md)
+
 - [Architecture and privacy plan](docs/architecture.md)
 - [Prototype-to-native screen mapping](docs/prototype-v0.41.md)
 - [Manual device checks](docs/device-checks.md)
