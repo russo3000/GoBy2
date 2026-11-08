@@ -13,6 +13,8 @@ not evidence of a standalone build or store release.
 - Scroll a shelf containing enough cards to overflow; check both arrow controls,
   touch scrolling, and returning from detail to the original shelf position.
 - Search by name/city/tip/list and check the no-results state and clear action.
+- Edit a list name, reject a duplicate name, move lists and places up/down, and
+  verify the new order survives closing and reopening the app.
 - Open detail; edit and change its list; return using iOS back swipe and Android
   hardware back. Check a draft can be dismissed normally.
 - Toggle day/night and reopen; check system status bar, notch/home-indicator

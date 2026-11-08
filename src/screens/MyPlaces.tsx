@@ -6,6 +6,9 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +17,15 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSQLiteContext } from "expo-sqlite";
 import { useLibrary } from "../data/LibraryProvider";
-import { Recommendation } from "../data/recommendations";
+import {
+  PlaceList,
+  Recommendation,
+  renamePlaceList,
+  setPlaceListOrder,
+  setPlaceOrder,
+} from "../data/recommendations";
 import { RootStackParams } from "../navigation";
 import { Button, Heading, IconButton, LocalNote } from "../ui/components";
 import { serif, useTheme } from "../ui/theme";
@@ -75,12 +85,14 @@ function Shelf({
   listId,
   open,
   add,
+  edit,
 }: {
   name: string;
   items: Recommendation[];
   listId: number;
   open: (id: number) => void;
   add: (id: number) => void;
+  edit: (id: number) => void;
 }) {
   const { colors: c } = useTheme();
   const { width } = useWindowDimensions();
@@ -103,6 +115,11 @@ function Shelf({
             {items.length} {items.length === 1 ? "place" : "places"}
           </Text>
         </View>
+        <IconButton
+          icon="create-outline"
+          label={`Edit ${name}`}
+          onPress={() => edit(listId)}
+        />
         <IconButton
           icon="chevron-back"
           label={`Previous places in ${name}`}
@@ -162,14 +179,200 @@ function Shelf({
     </View>
   );
 }
+
+function EditListModal({
+  list,
+  lists,
+  places,
+  onClose,
+}: {
+  list: PlaceList;
+  lists: PlaceList[];
+  places: Recommendation[];
+  onClose: () => void;
+}) {
+  const db = useSQLiteContext();
+  const { colors: c } = useTheme();
+  const { refresh } = useLibrary();
+  const [name, setName] = useState(list.name);
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+  const listIndex = lists.findIndex((item) => item.id === list.id);
+  const listPlaces = places.filter((place) => place.list_id === list.id);
+
+  async function persistOrder(update: () => Promise<void>) {
+    setError("");
+    setWorking(true);
+    try {
+      await update();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update this list.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function saveName() {
+    setError("");
+    setWorking(true);
+    try {
+      await renamePlaceList(db, list.id, name);
+      await refresh();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename this list.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function moveList(direction: -1 | 1) {
+    const next = listIndex + direction;
+    if (next < 0 || next >= lists.length) return;
+    const ids = lists.map((item) => item.id);
+    [ids[listIndex], ids[next]] = [ids[next], ids[listIndex]];
+    void persistOrder(() => setPlaceListOrder(db, ids));
+  }
+
+  function movePlace(index: number, direction: -1 | 1) {
+    const next = index + direction;
+    if (next < 0 || next >= listPlaces.length) return;
+    const ids = listPlaces.map((place) => place.id);
+    [ids[index], ids[next]] = [ids[next], ids[index]];
+    void persistOrder(() => setPlaceOrder(db, list.id, ids));
+  }
+
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={s.modalShade}>
+        <KeyboardAvoidingView
+          style={s.modalFrame}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View
+            style={[
+              s.editor,
+              { backgroundColor: c.surface, borderColor: c.line },
+            ]}
+          >
+            <View style={s.editorHeader}>
+              <Heading>Edit list</Heading>
+              <IconButton
+                icon="close"
+                label="Cancel list editing"
+                onPress={onClose}
+              />
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={s.editorContent}
+            >
+              <Text style={[s.editorLabel, { color: c.muted }]}>List name</Text>
+              <TextInput
+                accessibilityLabel="List name"
+                autoCapitalize="sentences"
+                maxLength={65}
+                onChangeText={setName}
+                returnKeyType="done"
+                style={[
+                  s.listNameInput,
+                  { color: c.ink, borderColor: c.line },
+                ]}
+                value={name}
+              />
+              <Button disabled={working} onPress={() => void saveName()}>
+                Save name
+              </Button>
+
+              <View style={[s.orderHeading, { borderColor: c.line }]}>
+                <Text style={[s.editorLabel, { color: c.ink }]}>
+                  List position · {listIndex + 1} of {lists.length}
+                </Text>
+                <View style={s.orderButtons}>
+                  <IconButton
+                    icon="arrow-up"
+                    label="Move list up"
+                    disabled={working || listIndex <= 0}
+                    onPress={() => moveList(-1)}
+                  />
+                  <IconButton
+                    icon="arrow-down"
+                    label="Move list down"
+                    disabled={working || listIndex >= lists.length - 1}
+                    onPress={() => moveList(1)}
+                  />
+                </View>
+              </View>
+
+              <Text style={[s.editorLabel, { color: c.ink }]}>Place order</Text>
+              {listPlaces.length ? (
+                listPlaces.map((place, index) => (
+                  <View
+                    key={place.id}
+                    style={[s.placeOrderRow, { borderColor: c.line }]}
+                  >
+                    <Text
+                      numberOfLines={2}
+                      style={[s.placeOrderName, { color: c.ink }]}
+                    >
+                      {place.title}
+                    </Text>
+                    <View style={s.orderButtons}>
+                      <IconButton
+                        icon="arrow-up"
+                        label={`Move ${place.title} up`}
+                        disabled={working || index === 0}
+                        onPress={() => movePlace(index, -1)}
+                      />
+                      <IconButton
+                        icon="arrow-down"
+                        label={`Move ${place.title} down`}
+                        disabled={working || index === listPlaces.length - 1}
+                        onPress={() => movePlace(index, 1)}
+                      />
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: c.muted }}>
+                  Add places to this list to set their order.
+                </Text>
+              )}
+              {!!error && (
+                <Text
+                  accessibilityRole="alert"
+                  style={{ color: c.error, lineHeight: 21 }}
+                >
+                  {error}
+                </Text>
+              )}
+              <Button secondary disabled={working} onPress={onClose}>
+                Done
+              </Button>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 export function MyPlaces() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const { colors: c } = useTheme();
   const { places, lists, loading, error, refresh } = useLibrary();
   const [searching, setSearching] = useState(false),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [editingListId, setEditingListId] = useState<number | null>(null);
   const q = query.trim().toLocaleLowerCase();
+  const editingList = lists.find((list) => list.id === editingListId);
   const filtered = places.filter((p) =>
     [
       p.title,
@@ -321,6 +524,7 @@ export function MyPlaces() {
                 items={filtered.filter((p) => p.list_id === l.id)}
                 open={open}
                 add={add}
+                edit={setEditingListId}
               />
             ))}
         </>
@@ -334,6 +538,15 @@ export function MyPlaces() {
         </Button>
       </View>
       <LocalNote />
+      {editingList && (
+        <EditListModal
+          key={editingList.id}
+          list={editingList}
+          lists={lists}
+          places={places}
+          onClose={() => setEditingListId(null)}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -418,6 +631,51 @@ const s = StyleSheet.create({
     borderStyle: "dashed",
     borderRadius: 14,
   },
+  modalShade: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "#0008",
+  },
+  modalFrame: { maxHeight: "92%" },
+  editor: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  editorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+  },
+  editorContent: { padding: 20, gap: 12 },
+  editorLabel: { fontSize: 14, fontWeight: "600" },
+  listNameInput: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
+  },
+  orderHeading: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  orderButtons: { flexDirection: "row", gap: 4 },
+  placeOrderRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  placeOrderName: { flex: 1, fontSize: 15 },
   welcome: { margin: 20, borderWidth: 1, borderRadius: 20, overflow: "hidden" },
   collage: { height: 180, flexDirection: "row", gap: 4 },
   collageLarge: { flex: 1.25, width: 0, height: "100%" },

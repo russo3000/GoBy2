@@ -16,6 +16,9 @@ const {
   listRecommendations,
   createPlaceList,
   listPlaceLists,
+  renamePlaceList,
+  setPlaceListOrder,
+  setPlaceOrder,
   savePlace,
   readTheme,
   writeTheme,
@@ -160,5 +163,101 @@ test("places and lists survive closing and reopening the database", async () => 
   } finally {
     database.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("lists can be renamed and reordered without losing their places", async () => {
+  const database = new DatabaseSync(":memory:");
+  try {
+    const db = adapter(database);
+    await initializeDatabase(db);
+    const first = await createPlaceList(db, "First");
+    const second = await createPlaceList(db, "Second");
+    await renamePlaceList(db, first, "  Weekend  ");
+    await assert.rejects(renamePlaceList(db, first, "Second"), /already have/);
+    await assert.rejects(renamePlaceList(db, first, "  "));
+    await assert.rejects(renamePlaceList(db, 999, "Missing"));
+
+    await setPlaceListOrder(db, [second, first, 1]);
+    let lists = await listPlaceLists(db);
+    assert.deepEqual(lists.map((list) => list.id), [second, first, 1]);
+    assert.equal(lists[1].name, "Weekend");
+    await assert.rejects(setPlaceListOrder(db, [first, first, second]));
+
+    const firstPlace = await savePlace(db, {
+      title: "First place",
+      tip: "",
+      city: "",
+      listId: first,
+    });
+    const secondPlace = await savePlace(db, {
+      title: "Second place",
+      tip: "",
+      city: "",
+      listId: first,
+    });
+    await setPlaceOrder(db, first, [firstPlace, secondPlace]);
+    let items = (await listRecommendations(db)).filter(
+      (place) => place.list_id === first,
+    );
+    assert.deepEqual(
+      items.map((place) => place.id),
+      [firstPlace, secondPlace],
+    );
+    await assert.rejects(setPlaceOrder(db, first, [firstPlace, firstPlace]));
+    items = (await listRecommendations(db)).filter(
+      (place) => place.list_id === first,
+    );
+    assert.deepEqual(
+      items.map((place) => place.id),
+      [firstPlace, secondPlace],
+    );
+  } finally {
+    database.close();
+  }
+});
+
+test("upgrades existing lists and places with ordering columns in place", async () => {
+  const database = new DatabaseSync(":memory:");
+  try {
+    database.exec(`
+      CREATE TABLE place_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK(length(trim(name)) BETWEEN 1 AND 65)
+      );
+      INSERT INTO place_lists (id, name) VALUES (1, 'Places to keep'), (8, 'Weekend');
+      CREATE TABLE recommendations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        tip TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT '2026-11-08T00:00:00Z',
+        city TEXT NOT NULL DEFAULT '',
+        list_id INTEGER NOT NULL DEFAULT 1 REFERENCES place_lists(id),
+        photo_uri TEXT
+      );
+      INSERT INTO recommendations (id, title, tip, city, list_id, photo_uri)
+        VALUES (12, 'Quiet cafe', 'Before noon', 'Girona', 8, 'file:///cafe.jpg');
+    `);
+    const db = adapter(database);
+    await initializeDatabase(db);
+    const lists = await listPlaceLists(db);
+    assert.deepEqual(
+      lists.map((list) => [list.id, list.name, list.position]),
+      [
+        [1, "Places to keep", 1],
+        [8, "Weekend", 8],
+      ],
+    );
+    const place = (await listRecommendations(db))[0];
+    assert.equal(place.id, 12);
+    assert.equal(place.tip, "Before noon");
+    assert.equal(place.city, "Girona");
+    assert.equal(place.list_id, 8);
+    assert.equal(place.sort_order, 0);
+    assert.equal(place.photo_uri, "file:///cafe.jpg");
+    const newList = await createPlaceList(db, "Later");
+    assert.equal((await listPlaceLists(db)).at(-1).id, newList);
+  } finally {
+    database.close();
   }
 });

@@ -36,6 +36,29 @@ const assert = require("node:assert/strict");
       .getByRole("textbox", { name: "New list name", exact: true })
       .fill("Slow Sundays");
     await page.getByRole("button", { name: "Save place", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Edit Slow Sundays", exact: true })
+      .click();
+    await page.getByText("List position · 2 of 2", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Move list up", exact: true }).click();
+    await page.getByText("List position · 1 of 2", { exact: true }).waitFor();
+    const listName = page.getByRole("textbox", {
+      name: "List name",
+      exact: true,
+    });
+    await listName.fill("Places to keep");
+    await page.getByRole("button", { name: "Save name", exact: true }).click();
+    await page
+      .getByText("You already have a list with that name.", { exact: true })
+      .waitFor();
+    await listName.fill("Slow Sundays in Barcelona");
+    await page.getByRole("button", { name: "Save name", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Edit Slow Sundays in Barcelona",
+        exact: true,
+      })
+      .waitFor();
     const card = page.getByRole("button", {
       name: "The little bakery, Barcelona. Ask for the off-menu omelette.",
       exact: true,
@@ -78,6 +101,7 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("button", { name: "Switch to night mode", exact: true })
       .click();
+    await page.waitForTimeout(500);
     await page.reload();
     await page
       .getByRole("button", { name: "Switch to day mode", exact: true })
@@ -139,7 +163,7 @@ const assert = require("node:assert/strict");
       .waitFor();
     assert.deepEqual(errors, []);
     console.log(
-      "PASS: create list, save, detail, edit, search, empty results, persisted theme, reload durability, offline save; no page errors",
+      "PASS: create, rename, and reorder lists; save, detail, edit, search, empty results, persisted theme, reload durability, offline save; no page errors",
     );
   } finally {
     await browser.close();

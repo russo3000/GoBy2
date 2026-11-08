@@ -12,7 +12,8 @@ SQLite storage. The v0.41 HTML prototype guides its branding and interaction des
 - Native stack navigation and bottom tabs; day/night themes remembered locally.
 - Personal lists and horizontally scrolling place shelves with touch and arrow controls.
 - Add a place with a name, optional city, personal tip, and optional device photo.
-- Create a named list while saving, or use “Places to keep”.
+- Create and rename named lists while saving, reorder lists and their places,
+  or use “Places to keep”.
 - Search names, cities, lists, and tips. Open place details, edit, and find in maps.
 - Offline saves, persistent photo copies, and migration of the original guest notebook.
 
@@ -89,7 +90,8 @@ npm test
 ```
 
 Storage tests use a real SQLite engine, including upgrade preservation, foreign
-keys, validation, editing, settings, and reopening a database from disk.
+keys, list naming and ordering, place editing, settings, and reopening a database
+from disk.
 
 With `npm run web` already running on port 8081, run:
 
