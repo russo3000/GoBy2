@@ -32,7 +32,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.cjs",
-    "test:browser": "node tests/browser/my-places.cjs"
+    "test:browser": "node tests/browser/my-places.cjs",
+    "review:build": "GOBY_REVIEW_BASE_PATH=/Goby2 expo export --platform web",
+    "review:serve": "node scripts/review-server.cjs",
+    "review": "npm run review:build && npm run review:serve"
   },
   "private": true
 }

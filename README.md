@@ -42,6 +42,45 @@ headers required by SQLite. A separately hosted web export would also need
 Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp.
 Browser preview data is separate from device data.
 
+## Named local projects
+
+For a review at **http://localhost/Goby2**, run:
+
+```sh
+npm run review
+```
+
+This builds the web app with `/Goby2` as its asset base and starts a loopback-only
+project gateway on port 80. `/Goby2` redirects to `/Goby2/`. Keep Terminal open.
+The home page at `http://localhost/` lists registered projects. This is a compiled
+review build: after code changes, stop it with Ctrl+C and run `npm run review`
+again. `npm run web` remains available for Expo development with live updates.
+
+`review-projects.json` maps each project name to a **built web directory**, relative
+to that JSON file. For example, a future project could be registered as:
+
+```json
+{
+  "Goby2": "./dist",
+  "AnotherProject": "../AnotherProject/dist"
+}
+```
+
+That other app must be built for its own `/AnotherProject` base path. Use one
+running gateway for all projects; it reloads the registry without a restart.
+An external registry can be selected with `GOBY_PROJECTS_CONFIG=/path/to/projects.json`.
+Only the registered build directories are served, with the isolation headers
+needed by browser SQLite. There is no automatic directory listing or source serving.
+
+If port 80 is occupied, identify the existing local server before starting another.
+If your Mac denies access to port 80, run only the static gateway with elevated
+permission after a normal build: `sudo "$(command -v node)" scripts/review-server.cjs`.
+Do not run npm installation or builds with sudo. Alternatively,
+`GOBY_REVIEW_PORT=8080 npm run review:serve` uses `http://localhost:8080/Goby2/`.
+
+Browser data at localhost:8081 and localhost are stored separately because ports
+are different origins. The new route does not automatically import earlier preview saves.
+
 ## Validation
 
 ```sh
